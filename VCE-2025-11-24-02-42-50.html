@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>کاوشگر ذرات ⚡</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="manifest" href="data:application/manifest+json,{\"name\":\"کاوشگر ذرات\",\"short_name\":\"ذرات\",\"display\":\"standalone\",\"theme_color\":\"#6A0DAD\",\"icons\":[{\"src\":\"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==\",\"sizes\":\"192x192\"}]}">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;700;900&display=swap');
+        *{box-sizing:border-box;}body{font-family:'Vazirmatn',sans-serif;background:radial-gradient(ellipse,#0a0a2a,#000);color:#fff;margin:0;overflow:hidden;height:100vh;display:flex;align-items:center;justify-content:center;padding:10px;}
+        #gameContainer{position:relative;width:100%;max-width:400px;height:700px;background:#000;border:3px solid transparent;border-image:linear-gradient(45deg,#6A0DAD,#00ffff,#ff0080)1;border-radius:24px;box-shadow:0 0 60px rgba(106,13,173,0.7),inset 0 0 40px rgba(0,0,0,0.5);overflow:hidden;}
+        #gameCanvas{display:block;width:100%;height:calc(100% - 140px);touch-action:none;}
+        .ui-overlay{position:absolute;top:0;left:0;right:0;bottom:0;pointer-events:none;z-index:20;}
+        .score{position:absolute;top:20px;left:20px;font-size:24px;font-weight:900;background:rgba(0,0,0,0.8);padding:12px 20px;border-radius:20px;text-shadow:0 0 20px #FFD700;box-shadow:0 0 30px rgba(255,215,0,0.5);pointer-events:auto;}
+        .level{position:absolute;top:20px;right:20px;font-size:20px;background:rgba(106,13,173,0.9);padding:12px 20px;border-radius:20px;box-shadow:0 0 25px #6A0DAD;}
+        .controls{position:absolute;bottom:20px;left:50%;transform:translateX(-50%);display:flex;gap:50px;pointer-events:auto;}
+        .ctrl-btn{width:100px;height:100px;border-radius:50%;font-size:52px;font-weight:900;display:flex;align-items:center;justify-content:center;background:linear-gradient(145deg,#222,#111);box-shadow:0 15px 40px rgba(0,0,0,0.8),inset 0 0 25px rgba(255,255,255,0.15),0 0 0 4px rgba(255,255,255,0.1);transition:all 0.25s ease;border:none;cursor:pointer;}
+        .ctrl-btn:active{transform:scale(0.88) translateY(5px);box-shadow:0 8px 25px rgba(0,0,0,0.9);}
+        .ctrl-pos{color:#ff4477;text-shadow:0 0 15px #ff4477;}
+        .ctrl-neg{color:#44aaff;text-shadow:0 0 15px #44aaff;}
+        .charge-ring{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:140px;height:140px;border-radius:50%;pointer-events:none;opacity:0;transition:all 0.4s cubic-bezier(0.25,0.46,0.45,0.94);box-shadow:0 0 60px 20px;}
+        .positive .charge-ring{opacity:1;border:6px solid #ff4477;box-shadow:0 0 80px #ff4477,0 0 120px #ff4477,inset 0 0 50px rgba(255,68,119,0.3);animation:pulse-pos 1.8s infinite;}
+        .negative .charge-ring{opacity:1;border:6px solid #44aaff;box-shadow:0 0 80px #44aaff,0 0 120px #44aaff,inset 0 0 50px rgba(68,170,255,0.3);animation:pulse-neg 1.8s infinite;}
+        @keyframes pulse-pos{0%,100%{transform:translate(-50%,-50%) scale(1);box-shadow:0 0 80px #ff4477,0 0 120px #ff4477;}50%{transform:translate(-50%,-50%) scale(1.2);box-shadow:0 0 100px #ff4477,0 0 160px #ff4477;}}
+        @keyframes pulse-neg{0%,100%{transform:translate(-50%,-50%) scale(1);box-shadow:0 0 80px #44aaff,0 0 120px #44aaff;}50%{transform:translate(-50%,-50%) scale(1.2);box-shadow:0 0 100px #44aaff,0 0 160px #44aaff;}}
+        #feedback{position:absolute;bottom:160px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,0.95);padding:20px 40px;border-radius:30px;font-size:20px;font-weight:700;text-align:center;opacity:0;transition:all 0.4s;pointer-events:none;box-shadow:0 20px 60px rgba(0,0,0,0.8);}
+        #feedback.show{opacity:1;transform:translateX(-50%) translateY(-10px);}
+    </style>
+</head>
+<body>
+    <div id="gameContainer">
+        <div class="ui-overlay">
+            <div class="score">QE: <span id="scoreVal">0</span></div>
+            <div class="level">مرحله <span id="levelVal">1</span></div>
+            <div class="charge-ring" id="chargeRing"></div>
+            <div id="feedback"></div>
+        </div>
+        <canvas id="gameCanvas"></canvas>
+        <div class="controls">
+            <button class="ctrl-btn ctrl-neg" ontouchstart="startCharge(-1)" ontouchend="releaseCharge()" onmousedown="startCharge(-1)" onmouseup="releaseCharge()" onmouseleave="releaseCharge()">−</button>
+            <button class="ctrl-btn ctrl-pos" ontouchstart="startCharge(1)" ontouchend="releaseCharge()" onmousedown="startCharge(1)" onmouseup="releaseCharge()" onmouseleave="releaseCharge()">+</button>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const container = document.getElementById('gameContainer');
+        const scoreVal = document.getElementById('scoreVal');
+        const levelVal = document.getElementById('levelVal');
+        const chargeRing = document.getElementById('chargeRing');
+        const feedback = document.getElementById('feedback');
+
+        const WIDTH = 360;
+        const HEIGHT = 580;
+        canvas.width = WIDTH;
+        canvas.height = HEIGHT;
+
+        const PHYSICS_CONSTANT = 4200;
+        const DRAG_FACTOR = 0.985;
+        const MAX_SPEED = 8;
+        const THRUST_STRENGTH = 0.35;
+        const LORENTZ_STRENGTH = 0.65;
+        const NEUTRALIZATION_DELAY = 1000;
+
+        let ship, particles = [], qeParticles = [], goal;
+        let totalQE = 0, currentLevelIndex = 0;
+        let thrusting = false, lastTouchX, lastTouchY;
+        let neutralizationTimer = null;
+        let shipTrail = [], stars = [];
+
+        class GameObject {
+            constructor(x, y, radius, charge, color, type = 'particle', field = null) {
+                this.x = x; this.y = y; this.radius = radius; this.charge = charge;
+                this.color = color; this.vx = 0; this.vy = 0; this.type = type; this.field = field;
+                this.collected = false;
+            }
+            draw() {
+                if (this.collected && this.type === 'qe') return;
+                if (this.type === 'ship') {
+                    const angle = Math.atan2(this.vy, this.vx) + Math.PI / 2;
+                    ctx.save();
+                    ctx.translate(this.x, this.y);
+                    ctx.rotate(angle);
+                    // سفینه شیک
+                    ctx.beginPath();
+                    ctx.moveTo(0, -this.radius * 1.5);
+                    ctx.lineTo(-this.radius * 0.8, this.radius * 0.8);
+                    ctx.lineTo(-this.radius * 0.3, this.radius * 1.3);
+                    ctx.lineTo(this.radius * 0.3, this.radius * 1.3);
+                    ctx.lineTo(this.radius * 0.8, this.radius * 0.8);
+                    ctx.closePath();
+                    const shipColor = this.charge > 0 ? '#ff5566' : this.charge < 0 ? '#55aaff' : '#666699';
+                    ctx.fillStyle = shipColor;
+                    ctx.shadowBlur = 35; ctx.shadowColor = shipColor; ctx.fill();
+                    ctx.shadowBlur = 0;
+                    ctx.strokeStyle = 'rgba(255,255,255,0.6)'; ctx.lineWidth = 2.5; ctx.stroke();
+                    // موتور
+                    if (thrusting) {
+                        ctx.save();
+                        ctx.translate(0, this.radius * 1.2);
+                        const pulse = Math.sin(Date.now() * 0.03) * 3;
+                        ctx.beginPath();
+                        ctx.ellipse(0, pulse, this.radius * 0.6, this.radius * 1.2, 0, 0, Math.PI * 2);
+                        ctx.fillStyle = this.charge > 0 ? '#ffaa44' : this.charge < 0 ? '#44aaff' : '#aaaa88';
+                        ctx.shadowBlur = 50; ctx.shadowColor = ctx.fillStyle; ctx.fill();
+                        ctx.shadowBlur = 0;
+                        ctx.restore();
+                    }
+                    ctx.restore();
+                    return;
+                }
+                ctx.save();
+                ctx.shadowBlur = this.type === 'qe' ? 45 : this.type === 'goal' ? 55 : 25;
+                ctx.shadowColor = this.type === 'qe' ? '#FFD700' : this.type === 'goal' ? '#8B00FF' : this.color;
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+                ctx.fillStyle = this.type === 'qe' ? '#FFD700' : this.type === 'goal' ? '#8B00FF' : this.color;
+                ctx.fill();
+                ctx.shadowBlur = 0;
+                ctx.restore();
+                // متن
+                ctx.font = `${this.radius * 1.1}px Vazirmatn`;
+                ctx.fillStyle = '#000';
+                ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+                const text = this.type === 'qe' ? 'QE' : this.type === 'goal' ? '🎯' : (this.charge > 0 ? '+' : this.charge < 0 ? '-' : '');
+                ctx.fillText(text, this.x, this.y);
+            }
+        }
+
+        const levels = [
+            {
+                particles: [
+                    new GameObject(90, 160, 14, 1, '#ff5566'),
+                    new GameObject(270, 160, 14, -1, '#55aaff'),
+                    new GameObject(180, 300, 17, 1, '#ff5566')
+                ],
+                qe: [
+                    new GameObject(100, 210, 10, 0, '#FFD700', 'qe'),
+                    new GameObject(260, 210, 10, 0, '#FFD700', 'qe')
+                ],
+                goal: new GameObject(180, 50, 28, 0, '#8B00FF', 'goal'),
+                start: {x: 180, y: 520}
+            },
+            {
+                particles: [
+                    new GameObject(180, 270, 18, 0, '#6A0DAD', 'magnet', {x: 50, y: 160, width: 260, height: 220, fieldStrength: 1}),
+                    new GameObject(90, 200, 13, -1, '#55aaff'),
+                    new GameObject(270, 350, 13, -1, '#55aaff'),
+                    new GameObject(180, 470, 15, 1, '#ff5566')
+                ],
+                qe: [
+                    new GameObject(180, 270, 10, 0, '#FFD700', 'qe'),
+                    new GameObject(240, 200, 10, 0, '#FFD700', 'qe')
+                ],
+                goal: new GameObject(180, 50, 28, 0, '#8B00FF', 'goal'),
+                start: {x: 180, y: 520}
+            }
+        ];
+
+        function loadLevel(index) {
+            if (index >= levels.length) {
+                showFeedback('🏆 همه سطوح فتح شد! نابغه‌ای!', 'green');
+                return;
+            }
+            currentLevelIndex = index;
+            levelVal.textContent = index + 1;
+            const level = levels[index];
+            ship = new GameObject(level.start.x, level.start.y, 20, 0, '#666699', 'ship');
+            particles = level.particles.map(p => Object.assign(new GameObject(), p));
+            qeParticles = level.qe.map(p => Object.assign(new GameObject(), p));
+            goal = Object.assign(new GameObject(), level.goal);
+            shipTrail = [];
+            stars = Array.from({length: 150}, () => ({
+                x: Math.random() * WIDTH,
+                y: Math.random() * HEIGHT,
+                z: Math.random() * 4 + 1,
+                speed: Math.random() * 0.04 + 0.01
+            }));
+            showFeedback(`🚀 مرحله ${index + 1} آماده!`, 'blue');
+        }
+
+        function showFeedback(msg, color = 'white') {
+            feedback.textContent = msg;
+            feedback.classList.add('show');
+            feedback.style.color = color === 'green' ? '#4ade80' : color === 'red' ? '#f87171' : '#60a5fa';
+            setTimeout(() => feedback.classList.remove('show'), 3000);
+        }
+
+        window.startCharge = (charge) => {
+            if (ship.charge === charge) return;
+            if (neutralizationTimer) clearTimeout(neutralizationTimer);
+            ship.charge = charge;
+            container.className = charge > 0 ? 'positive' : 'negative';
+        };
+
+        window.releaseCharge = () => {
+            neutralizationTimer = setTimeout(() => {
+                ship.charge = 0;
+                container.className = '';
+            }, NEUTRALIZATION_DELAY);
+        };
+
+        function getTouchPos(e) {
+            const rect = canvas.getBoundingClientRect();
+            const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+            const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+            return {
+                x: (clientX - rect.left) * (WIDTH / rect.width),
+                y: (clientY - rect.top) * (HEIGHT / rect.height)
+            };
+        }
+
+        ['touchstart', 'mousedown'].forEach(ev => canvas.addEventListener(ev, (e) => {
+            e.preventDefault();
+            thrusting = true;
+            const pos = getTouchPos(e);
+            lastTouchX = pos.x;
+            lastTouchY = pos.y;
+        }));
+
+        ['touchmove', 'mousemove'].forEach(ev => canvas.addEventListener(ev, (e) => {
+            if (!thrusting) return;
+            e.preventDefault();
+            const pos = getTouchPos(e);
+            const dx = pos.x - lastTouchX;
+            const dy = pos.y - lastTouchY;
+            ship.vx -= dx * THRUST_STRENGTH * 0.08;
+            ship.vy -= dy * THRUST_STRENGTH * 0.08;
+            lastTouchX = pos.x;
+            lastTouchY = pos.y;
+        }));
+
+        ['touchend', 'mouseup', 'touchcancel'].forEach(ev => canvas.addEventListener(ev, () => {
+            thrusting = false;
+        }));
+
+        function checkCollision(a, b) {
+            const dx = a.x - b.x, dy = a.y - b.y;
+            return Math.hypot(dx, dy) < a.radius + b.radius - 5;
+        }
+
+        function inField(pos, field) {
+            return pos.x > field.x && pos.x < field.x + field.width && pos.y > field.y && pos.y < field.y + field.height;
+        }
+
+        function update() {
+            if (ship.charge !== 0) {
+                // نیروی کولن
+                particles.forEach(p => {
+                    if (p.charge === 0 || p.type === 'magnet') return;
+                    const dx = p.x - ship.x;
+                    const dy = p.y - ship.y;
+                    const dist = Math.hypot(dx, dy) || 1;
+                    const force = PHYSICS_CONSTANT * ship.charge * p.charge / (dist * dist + 80);
+                    ship.vx += (dx / dist) * force * 0.0008;
+                    ship.vy += (dy / dist) * force * 0.0008;
+                });
+            }
+            // لورنتس
+            if (ship.charge !== 0) {
+                particles.filter(p => p.type === 'magnet').forEach(m => {
+                    if (inField(ship, m.field)) {
+                        const B = m.field.fieldStrength;
+                        const fx = -ship.charge * ship.vy * B * LORENTZ_STRENGTH * 0.5;
+                        const fy = ship.charge * ship.vx * B * LORENTZ_STRENGTH * 0.5;
+                        ship.vx += fx;
+                        ship.vy += fy;
+                    }
+                });
+            }
+            // برخورد ذرات
+            particles.filter(p => p.type !== 'magnet').forEach(p => {
+                if (checkCollision(ship, p)) resetShip();
+            });
+            // QE
+            qeParticles.forEach((qe, i) => {
+                if (!qe.collected && checkCollision(ship, qe)) {
+                    qe.collected = true;
+                    totalQE += 25;
+                    scoreVal.textContent = totalQE;
+                }
+            });
+            // هدف
+            if (checkCollision(ship, goal)) {
+                showFeedback(`✅ مرحله ${currentLevelIndex + 1} کامل!`, 'green');
+                setTimeout(() => loadLevel(currentLevelIndex + 1), 1500);
+                return;
+            }
+            // trail
+            shipTrail.push({x: ship.x, y: ship.y});
+            if (shipTrail.length > 30) shipTrail.shift();
+            // ترمز و سرعت
+            ship.vx *= DRAG_FACTOR;
+            ship.vy *= DRAG_FACTOR;
+            const speed = Math.hypot(ship.vx, ship.vy);
+            if (speed > MAX_SPEED) {
+                ship.vx = (ship.vx / speed) * MAX_SPEED;
+                ship.vy = (ship.vy / speed) * MAX_SPEED;
+            }
+            // حرکت
+            ship.x += ship.vx;
+            ship.y += ship.vy;
+            // مرزها
+            if (ship.x < 25) { ship.x = 25; ship.vx *= -0.7; }
+            if (ship.x > WIDTH - 25) { ship.x = WIDTH - 25; ship.vx *= -0.7; }
+            if (ship.y < 25) { ship.y = 25; ship.vy *= -0.7; }
+            if (ship.y > HEIGHT - 25) { ship.y = HEIGHT - 25; ship.vy *= -0.7; }
+            // ستاره‌ها
+            stars.forEach(s => {
+                s.y += s.speed * 2;
+                if (s.y > HEIGHT) s.y = 0;
+            });
+        }
+
+        function draw() {
+            ctx.fillStyle = '#000011';
+            ctx.fillRect(0, 0, WIDTH, HEIGHT);
+            // ستاره‌ها
+            ctx.fillStyle = '#ffffff';
+            stars.forEach(s => {
+                ctx.globalAlpha = s.z * 0.7;
+                ctx.fillRect(s.x, s.y, s.z * 2, s.z * 2);
+            });
+            ctx.globalAlpha = 1;
+            // trail
+            for (let i = 0; i < shipTrail.length; i++) {
+                const alpha = i / shipTrail.length;
+                const p = shipTrail[i];
+                ctx.save();
+                ctx.globalAlpha = alpha * 0.8;
+                ctx.shadowBlur = alpha * 25;
+                ctx.shadowColor = ship.charge > 0 ? '#ff5566' : ship.charge < 0 ? '#55aaff' : '#8888aa';
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, alpha * 12, 0, Math.PI * 2);
+                ctx.fillStyle = `rgba(255,255,255,${alpha * 0.5})`;
+                ctx.fill();
+                ctx.restore();
+            }
+            ship.draw();
+            particles.forEach(p => p.draw());
+            qeParticles.forEach(p => p.draw());
+            goal.draw();
+        }
+
+        function resetShip() {
+            showFeedback('💥 برخورد! دوباره!', 'red');
+            loadLevel(currentLevelIndex);
+        }
+
+        function gameLoop() {
+            update();
+            draw();
+            requestAnimationFrame(gameLoop);
+        }
+
+        loadLevel(0);
+        gameLoop();
+    </script>
+</body>
+</html>
