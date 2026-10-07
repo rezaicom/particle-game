@@ -8,8 +8,8 @@
     <link rel="manifest" href="data:application/manifest+json,{\"name\":\"کاوشگر ذرات\",\"short_name\":\"ذرات\",\"display\":\"standalone\",\"theme_color\":\"#6A0DAD\",\"icons\":[{\"src\":\"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==\",\"sizes\":\"192x192\"}]}">
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;700;900&display=swap');
-        *{box-sizing:border-box;}body{font-family:'Vazirmatn',sans-serif;background:radial-gradient(ellipse,#0a0a2a,#000);color:#fff;margin:0;overflow:hidden;height:100vh;display:flex;align-items:center;justify-content:center;padding:10px;}
-        #gameContainer{position:relative;width:100%;max-width:400px;height:700px;background:#000;border:3px solid transparent;border-image:linear-gradient(45deg,#6A0DAD,#00ffff,#ff0080)1;border-radius:24px;box-shadow:0 0 60px rgba(106,13,173,0.7),inset 0 0 40px rgba(0,0,0,0.5);overflow:hidden;}
+        *{box-sizing:border-box;}body{font-family:'Vazirmatn',sans-serif;background:radial-gradient(ellipse,#0a0a2a,#000);color:#fff;margin:0;overflow:hidden;height:100vh;height:100dvh;display:flex;align-items:center;justify-content:center;padding:10px;}
+        #gameContainer{position:relative;width:100%;max-width:400px;height:700px;height:min(700px,calc(100vh - 20px));height:min(700px,calc(100dvh - 20px));background:#000;border:3px solid transparent;border-image:linear-gradient(45deg,#6A0DAD,#00ffff,#ff0080)1;border-radius:24px;box-shadow:0 0 60px rgba(106,13,173,0.7),inset 0 0 40px rgba(0,0,0,0.5);overflow:hidden;}
         #gameCanvas{display:block;width:100%;height:calc(100% - 140px);touch-action:none;}
         .ui-overlay{position:absolute;top:0;left:0;right:0;bottom:0;pointer-events:none;z-index:20;}
         .score{position:absolute;top:20px;left:20px;font-size:24px;font-weight:900;background:rgba(0,0,0,0.8);padding:12px 20px;border-radius:20px;text-shadow:0 0 20px #FFD700;box-shadow:0 0 30px rgba(255,215,0,0.5);pointer-events:auto;}
@@ -38,8 +38,8 @@
         </div>
         <canvas id="gameCanvas"></canvas>
         <div class="controls">
-            <button class="ctrl-btn ctrl-neg" ontouchstart="startCharge(-1)" ontouchend="releaseCharge()" onmousedown="startCharge(-1)" onmouseup="releaseCharge()" onmouseleave="releaseCharge()">−</button>
-            <button class="ctrl-btn ctrl-pos" ontouchstart="startCharge(1)" ontouchend="releaseCharge()" onmousedown="startCharge(1)" onmouseup="releaseCharge()" onmouseleave="releaseCharge()">+</button>
+            <button class="ctrl-btn ctrl-neg" ontouchstart="startCharge(-1)" ontouchend="releaseCharge()" ontouchcancel="releaseCharge()" onmousedown="startCharge(-1)" onmouseup="releaseCharge()" onmouseleave="releaseCharge()">−</button>
+            <button class="ctrl-btn ctrl-pos" ontouchstart="startCharge(1)" ontouchend="releaseCharge()" ontouchcancel="releaseCharge()" onmousedown="startCharge(1)" onmouseup="releaseCharge()" onmouseleave="releaseCharge()">+</button>
         </div>
     </div>
 
@@ -197,13 +197,15 @@
 
         window.startCharge = (charge) => {
             if (gameState !== 'playing') return;
-            if (ship.charge === charge) return;
             if (neutralizationTimer) clearTimeout(neutralizationTimer);
+            neutralizationTimer = null;
+            if (ship.charge === charge) return;
             ship.charge = charge;
             container.className = charge > 0 ? 'positive' : 'negative';
         };
 
         window.releaseCharge = () => {
+            if (neutralizationTimer) clearTimeout(neutralizationTimer);
             neutralizationTimer = setTimeout(() => {
                 ship.charge = 0;
                 container.className = '';
