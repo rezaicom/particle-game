@@ -164,6 +164,10 @@
         function loadLevel(index) {
             clearTimeout(levelTransitionTimer);
             levelTransitionTimer = null;
+            clearTimeout(neutralizationTimer);
+            neutralizationTimer = null;
+            thrusting = false;
+            container.className = '';
             if (index >= levels.length) {
                 gameState = 'completed';
                 thrusting = false;
@@ -205,6 +209,7 @@
         };
 
         window.releaseCharge = () => {
+            if (gameState !== 'playing') return;
             if (neutralizationTimer) clearTimeout(neutralizationTimer);
             neutralizationTimer = setTimeout(() => {
                 ship.charge = 0;
@@ -265,7 +270,7 @@
                     const dx = p.x - ship.x;
                     const dy = p.y - ship.y;
                     const dist = Math.hypot(dx, dy) || 1;
-                    const force = PHYSICS_CONSTANT * ship.charge * p.charge / (dist * dist + 80);
+                    const force = -PHYSICS_CONSTANT * ship.charge * p.charge / (dist * dist + 80);
                     ship.vx += (dx / dist) * force * 0.0008;
                     ship.vy += (dy / dist) * force * 0.0008;
                 });
