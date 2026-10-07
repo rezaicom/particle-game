@@ -66,6 +66,7 @@
 
         let ship, particles = [], qeParticles = [], goal;
         let totalQE = 0, currentLevelIndex = 0;
+        let currentLevelQE = 0;
         let thrusting = false, lastTouchX, lastTouchY;
         let neutralizationTimer = null;
         let levelTransitionTimer = null;
@@ -175,6 +176,7 @@
                 return;
             }
             gameState = 'playing';
+            currentLevelQE = 0;
             currentLevelIndex = index;
             levelVal.textContent = index + 1;
             const level = levels[index];
@@ -288,14 +290,18 @@
                 });
             }
             // برخورد ذرات
-            particles.filter(p => p.type !== 'magnet').forEach(p => {
-                if (checkCollision(ship, p)) resetShip();
-            });
+            for (const p of particles) {
+                if (p.type !== 'magnet' && checkCollision(ship, p)) {
+                    resetShip();
+                    return;
+                }
+            }
             // QE
             qeParticles.forEach((qe, i) => {
                 if (!qe.collected && checkCollision(ship, qe)) {
                     qe.collected = true;
                     totalQE += 25;
+                    currentLevelQE += 25;
                     scoreVal.textContent = totalQE;
                 }
             });
@@ -365,6 +371,8 @@
         }
 
         function resetShip() {
+            totalQE -= currentLevelQE;
+            scoreVal.textContent = totalQE;
             showFeedback('💥 برخورد! دوباره!', 'red');
             loadLevel(currentLevelIndex);
         }
