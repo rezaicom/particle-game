@@ -68,6 +68,8 @@
         let totalQE = 0, currentLevelIndex = 0;
         let thrusting = false, lastTouchX, lastTouchY;
         let neutralizationTimer = null;
+        let levelTransitionTimer = null;
+        let gameState = 'playing';
         let shipTrail = [], stars = [];
 
         class GameObject {
@@ -160,10 +162,15 @@
         ];
 
         function loadLevel(index) {
+            clearTimeout(levelTransitionTimer);
+            levelTransitionTimer = null;
             if (index >= levels.length) {
+                gameState = 'completed';
+                thrusting = false;
                 showFeedback('🏆 همه سطوح فتح شد! نابغه‌ای!', 'green');
                 return;
             }
+            gameState = 'playing';
             currentLevelIndex = index;
             levelVal.textContent = index + 1;
             const level = levels[index];
@@ -189,6 +196,7 @@
         }
 
         window.startCharge = (charge) => {
+            if (gameState !== 'playing') return;
             if (ship.charge === charge) return;
             if (neutralizationTimer) clearTimeout(neutralizationTimer);
             ship.charge = charge;
@@ -214,6 +222,7 @@
 
         ['touchstart', 'mousedown'].forEach(ev => canvas.addEventListener(ev, (e) => {
             e.preventDefault();
+            if (gameState !== 'playing') return;
             thrusting = true;
             const pos = getTouchPos(e);
             lastTouchX = pos.x;
@@ -246,6 +255,7 @@
         }
 
         function update() {
+            if (gameState !== 'playing') return;
             if (ship.charge !== 0) {
                 // نیروی کولن
                 particles.forEach(p => {
@@ -284,8 +294,11 @@
             });
             // هدف
             if (checkCollision(ship, goal)) {
+                gameState = 'transitioning';
+                thrusting = false;
                 showFeedback(`✅ مرحله ${currentLevelIndex + 1} کامل!`, 'green');
-                setTimeout(() => loadLevel(currentLevelIndex + 1), 1500);
+                const nextLevelIndex = currentLevelIndex + 1;
+                levelTransitionTimer = setTimeout(() => loadLevel(nextLevelIndex), 1500);
                 return;
             }
             // trail
